@@ -345,6 +345,80 @@ describe("pollingHttpRequest", () => {
 		assert.strictEqual(capturedOptions.body, undefined);
 	});
 
+	// ── CognigyScript (ci./cc.) Field Support ────────────────────────────────
+
+	it("accepts a pre-resolved JSON string as the body (simulates CognigyScript resolution)", async () => {
+		let capturedOptions: RequestInit = {};
+		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
+			capturedOptions = options;
+			return makeMockResponse({ status: "COMPLETED" });
+		});
+
+		await callNode(
+			baseConfig({
+				method: "POST",
+				bodyType: "json",
+				body: '{"jobId":"abc-123","userId":"42"}',
+			}),
+		);
+
+		assert.strictEqual(
+			capturedOptions.body,
+			'{"jobId":"abc-123","userId":"42"}',
+		);
+		assert.strictEqual(
+			(capturedOptions.headers as Record<string, string>)["Content-Type"],
+			"application/json",
+		);
+	});
+
+	it("accepts a pre-resolved JSON string for headers (simulates CognigyScript resolution)", async () => {
+		let capturedHeaders: Record<string, string> = {};
+		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
+			capturedHeaders = options.headers as Record<string, string>;
+			return makeMockResponse({ status: "COMPLETED" });
+		});
+
+		await callNode(
+			baseConfig({
+				headers: '{"X-Tenant-Id":"tenant-99","X-Request-Id":"req-001"}',
+			}),
+		);
+
+		assert.strictEqual(capturedHeaders["X-Tenant-Id"], "tenant-99");
+		assert.strictEqual(capturedHeaders["X-Request-Id"], "req-001");
+	});
+
+	it("accepts a pre-resolved JSON string for form-data body (simulates CognigyScript resolution)", async () => {
+		let capturedOptions: RequestInit = {};
+		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
+			capturedOptions = options;
+			return makeMockResponse({ status: "COMPLETED" });
+		});
+
+		await callNode(
+			baseConfig({
+				method: "POST",
+				bodyType: "formData",
+				bodyFormData: '{"name":"alice","role":"admin"}',
+			}),
+		);
+
+		assert.strictEqual(capturedOptions.body, "name=alice&role=admin");
+	});
+
+	it("throws a descriptive error when the headers field contains invalid JSON", async () => {
+		await assert.rejects(
+			() =>
+				callNode(
+					baseConfig({
+						headers: "not-valid-json",
+					}),
+				),
+			/"Headers" must be a valid JSON object/i,
+		);
+	});
+
 	// ── retryValues Consultation (Fix 1) ────────────────────────────────────
 
 	it("retryValues is explicitly consulted — a known retry value re-polls before resolving", async () => {

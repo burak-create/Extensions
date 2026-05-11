@@ -11,11 +11,11 @@ import { JSONPath } from "jsonpath-plus";
 export interface IPollingHttpRequestConfig {
 	method: "GET" | "POST" | "PUT" | "DELETE";
 	url: string;
-	headers: Record<string, string>;
+	headers: unknown;
 	bodyType: "none" | "json" | "text" | "formData";
 	body: unknown;
 	bodyText: string;
-	bodyFormData: Record<string, string>;
+	bodyFormData: unknown;
 	authType: "none" | "basicAuth" | "apiKey";
 	username: string;
 	password: string;
@@ -73,15 +73,45 @@ function resolveContentType(
 	}
 }
 
+/**
+ * Safely coerces a field value that may arrive as a plain JSON string
+ * (when the field type is cognigyText and Cognigy has resolved CognigyScript
+ * expressions) or as a plain object (test fixtures / older configs).
+ * Returns an empty object when the value is absent or empty.
+ */
+function parseJsonField(
+	value: unknown,
+	fieldName: string,
+): Record<string, unknown> {
+	if (value === null || value === undefined) return {};
+	if (typeof value === "object") return value as Record<string, unknown>;
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (trimmed === "" || trimmed === "{}") return {};
+		try {
+			return JSON.parse(trimmed) as Record<string, unknown>;
+		} catch {
+			throw new Error(
+				`Polling HTTP Request: "${fieldName}" must be a valid JSON object. Received: ${trimmed}`,
+			);
+		}
+	}
+	return {};
+}
+
 function buildBody(config: IPollingHttpRequestConfig): string | undefined {
 	switch (config.bodyType) {
 		case "json":
+			// config.body is a cognigyText string after CognigyScript resolution;
+			// fall back to JSON.stringify for object values (test fixtures / legacy).
+			if (typeof config.body === "string") return config.body;
 			return JSON.stringify(config.body ?? {});
 		case "text":
 			return String(config.bodyText ?? "");
 		case "formData": {
+			const parsed = parseJsonField(config.bodyFormData, "Body (Form Data)");
 			const params = new URLSearchParams();
-			for (const [k, v] of Object.entries(config.bodyFormData ?? {})) {
+			for (const [k, v] of Object.entries(parsed)) {
 				params.append(k, String(v));
 			}
 			return params.toString();
@@ -141,9 +171,13 @@ export const pollingHttpRequest = createNodeDescriptor({
 		{
 			key: "headers",
 			label: "Headers",
-			type: "json",
-			defaultValue: {},
-			description: "Additional request headers as a JSON object.",
+			type: "cognigyText",
+			defaultValue: "",
+			description:
+				'Additional request headers as a JSON object string. CognigyScript is supported, e.g. {"Authorization": "Bearer {{ci.token}}"}.',
+			params: {
+				placeholder: '{"Authorization": "Bearer {{ci.token}}"}',
+			},
 		},
 		{
 			key: "bodyType",
@@ -167,10 +201,14 @@ export const pollingHttpRequest = createNodeDescriptor({
 		},
 		{
 			key: "body",
-			label: "Body",
-			type: "json",
-			defaultValue: {},
-			description: "Request body as a JSON object.",
+			label: "Body (JSON)",
+			type: "cognigyText",
+			defaultValue: "{}",
+			description:
+				'Request body as a JSON object string. CognigyScript is supported, e.g. {"jobId": "{{ci.jobId}}"}.',
+			params: {
+				placeholder: '{"key": "{{ci.value}}"}',
+			},
 			condition: {
 				key: "bodyType",
 				value: "json",
@@ -190,10 +228,13 @@ export const pollingHttpRequest = createNodeDescriptor({
 		{
 			key: "bodyFormData",
 			label: "Body (Form Data)",
-			type: "json",
-			defaultValue: {},
+			type: "cognigyText",
+			defaultValue: "{}",
 			description:
-				"Request body as a JSON object of key-value pairs, sent as form-encoded data.",
+				'Request body as a JSON object string of key-value pairs, sent as form-encoded data. CognigyScript is supported, e.g. {"name": "{{ci.name}}"}.',
+			params: {
+				placeholder: '{"name": "{{ci.name}}"}',
+			},
 			condition: {
 				key: "bodyType",
 				value: "formData",
@@ -419,9 +460,15 @@ export const pollingHttpRequest = createNodeDescriptor({
 			);
 		}
 
-		// Build static request headers (auth headers computed once)
+		// Build static request headers (auth headers computed once).
+		// parseJsonField handles both cognigyText strings (CognigyScript resolved)
+		// and plain objects (test fixtures / legacy configs).
+		const parsedHeaders = parseJsonField(config.headers, "Headers") as Record<
+			string,
+			string
+		>;
 		const requestHeaders: Record<string, string> = {
-			...(config.headers ?? {}),
+			...parsedHeaders,
 			...buildAuthHeaders(config),
 		};
 		const contentType = resolveContentType(config.bodyType);
