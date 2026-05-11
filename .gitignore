@@ -17,3 +17,4 @@ coverage/
 *.tar.gz
 /**/.DS_Store
 .history
+!extensions/polling-http-request/polling-http-request.tar.gz
