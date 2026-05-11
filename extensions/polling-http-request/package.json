@@ -1,0 +1,33 @@
+{
+	"name": "polling-http-request",
+	"version": "1.0.0",
+	"description": "A Cognigy.AI Extension that performs polling HTTP requests with configurable retry logic, entirely within the Extension execution context.",
+	"main": "build/module.js",
+	"scripts": {
+		"test": "node --test --import=tsx --experimental-test-coverage --test-coverage-exclude='**/*.test.ts'",
+		"transpile": "tsc -p tsconfig.production.json",
+		"zip": "tar cfz polling-http-request.tar.gz build/* package.json package-lock.json README.md icon.png",
+		"build": "npm run test && npm run transpile && npm run lint && npm run zip",
+		"format": "biome check --write",
+		"lint": "biome check"
+	},
+	"keywords": [
+		"Cognigy.AI",
+		"extensions",
+		"http",
+		"polling",
+		"retry"
+	],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"@cognigy/extension-tools": "0.17.0",
+		"jsonpath-plus": "^10.3.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.2.4",
+		"@types/node": "^22.18.5",
+		"tsx": "4.21.0",
+		"typescript": "^5.9.2"
+	}
+}
