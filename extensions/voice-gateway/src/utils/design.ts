@@ -1,1 +1,0 @@
-export const nodeColor = "#F5A623";
