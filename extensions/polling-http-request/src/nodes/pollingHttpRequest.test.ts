@@ -39,7 +39,18 @@ function baseConfig(
 	return {
 		method: "GET",
 		url: "https://api.example.com/jobs/42",
+		headersMode: "json",
 		headers: {},
+		header1Name: "",
+		header1Value: "",
+		header2Name: "",
+		header2Value: "",
+		header3Name: "",
+		header3Value: "",
+		header4Name: "",
+		header4Value: "",
+		header5Name: "",
+		header5Value: "",
 		bodyType: "none",
 		body: {},
 		bodyText: "",
@@ -347,7 +358,7 @@ describe("pollingHttpRequest", () => {
 
 	// ── CognigyScript (ci./cc.) Field Support ────────────────────────────────
 
-	it("accepts a pre-resolved JSON string as the body (simulates CognigyScript resolution)", async () => {
+	it("passes an object body as serialised JSON (json-type field, CognigyScript resolved in platform)", async () => {
 		let capturedOptions: RequestInit = {};
 		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
 			capturedOptions = options;
@@ -358,13 +369,15 @@ describe("pollingHttpRequest", () => {
 			baseConfig({
 				method: "POST",
 				bodyType: "json",
-				body: '{"jobId":"abc-123","userId":"42"}',
+				// json-type fields deliver a plain object (with CognigyScript resolved
+				// in string values by the platform before the Extension is called)
+				body: { jobId: "abc-123", userId: "42" },
 			}),
 		);
 
 		assert.strictEqual(
 			capturedOptions.body,
-			'{"jobId":"abc-123","userId":"42"}',
+			JSON.stringify({ jobId: "abc-123", userId: "42" }),
 		);
 		assert.strictEqual(
 			(capturedOptions.headers as Record<string, string>)["Content-Type"],
@@ -372,7 +385,7 @@ describe("pollingHttpRequest", () => {
 		);
 	});
 
-	it("accepts a pre-resolved JSON string for headers (simulates CognigyScript resolution)", async () => {
+	it("passes object headers from the JSON editor (headersMode: json)", async () => {
 		let capturedHeaders: Record<string, string> = {};
 		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
 			capturedHeaders = options.headers as Record<string, string>;
@@ -381,7 +394,10 @@ describe("pollingHttpRequest", () => {
 
 		await callNode(
 			baseConfig({
-				headers: '{"X-Tenant-Id":"tenant-99","X-Request-Id":"req-001"}',
+				headersMode: "json",
+				// json-type field delivers a plain object; string values have CognigyScript
+				// already resolved by the platform
+				headers: { "X-Tenant-Id": "tenant-99", "X-Request-Id": "req-001" },
 			}),
 		);
 
@@ -389,29 +405,53 @@ describe("pollingHttpRequest", () => {
 		assert.strictEqual(capturedHeaders["X-Request-Id"], "req-001");
 	});
 
-	it("accepts a pre-resolved JSON string for form-data body (simulates CognigyScript resolution)", async () => {
-		let capturedOptions: RequestInit = {};
+	it("builds headers from individual key-value cognigyText pairs (headersMode: keyValue)", async () => {
+		let capturedHeaders: Record<string, string> = {};
 		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
-			capturedOptions = options;
+			capturedHeaders = options.headers as Record<string, string>;
 			return makeMockResponse({ status: "COMPLETED" });
 		});
 
 		await callNode(
 			baseConfig({
-				method: "POST",
-				bodyType: "formData",
-				bodyFormData: '{"name":"alice","role":"admin"}',
+				headersMode: "keyValue",
+				header1Name: "Authorization",
+				header1Value: "Bearer token-abc",
+				header2Name: "X-Tenant-Id",
+				header2Value: "tenant-99",
 			}),
 		);
 
-		assert.strictEqual(capturedOptions.body, "name=alice&role=admin");
+		assert.strictEqual(capturedHeaders.Authorization, "Bearer token-abc");
+		assert.strictEqual(capturedHeaders["X-Tenant-Id"], "tenant-99");
 	});
 
-	it("throws a descriptive error when the headers field contains invalid JSON", async () => {
+	it("ignores blank header entries in keyValue mode", async () => {
+		let capturedHeaders: Record<string, string> = {};
+		mock.method(global, "fetch", async (_url: string, options: RequestInit) => {
+			capturedHeaders = options.headers as Record<string, string>;
+			return makeMockResponse({ status: "COMPLETED" });
+		});
+
+		await callNode(
+			baseConfig({
+				headersMode: "keyValue",
+				header1Name: "X-Api-Key",
+				header1Value: "key-xyz",
+				// header2-5 left blank (default "")
+			}),
+		);
+
+		assert.strictEqual(capturedHeaders["X-Api-Key"], "key-xyz");
+		assert.strictEqual(Object.keys(capturedHeaders).length, 1);
+	});
+
+	it("throws a descriptive error when the headers JSON editor contains invalid JSON string", async () => {
 		await assert.rejects(
 			() =>
 				callNode(
 					baseConfig({
+						headersMode: "json",
 						headers: "not-valid-json",
 					}),
 				),

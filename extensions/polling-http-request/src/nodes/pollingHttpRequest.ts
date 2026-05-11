@@ -11,7 +11,18 @@ import { JSONPath } from "jsonpath-plus";
 export interface IPollingHttpRequestConfig {
 	method: "GET" | "POST" | "PUT" | "DELETE";
 	url: string;
+	headersMode: "json" | "keyValue";
 	headers: unknown;
+	header1Name: string;
+	header1Value: string;
+	header2Name: string;
+	header2Value: string;
+	header3Name: string;
+	header3Value: string;
+	header4Name: string;
+	header4Value: string;
+	header5Name: string;
+	header5Value: string;
 	bodyType: "none" | "json" | "text" | "formData";
 	body: unknown;
 	bodyText: string;
@@ -102,13 +113,14 @@ function parseJsonField(
 function buildBody(config: IPollingHttpRequestConfig): string | undefined {
 	switch (config.bodyType) {
 		case "json":
-			// config.body is a cognigyText string after CognigyScript resolution;
-			// fall back to JSON.stringify for object values (test fixtures / legacy).
+			// body comes from a json-type field — Cognigy resolves {{ci.x}} in string
+			// values before passing the object. Stringify the whole thing.
 			if (typeof config.body === "string") return config.body;
 			return JSON.stringify(config.body ?? {});
 		case "text":
 			return String(config.bodyText ?? "");
 		case "formData": {
+			// bodyFormData comes from a json-type field (object) or legacy string.
 			const parsed = parseJsonField(config.bodyFormData, "Body (Form Data)");
 			const params = new URLSearchParams();
 			for (const [k, v] of Object.entries(parsed)) {
@@ -169,15 +181,99 @@ export const pollingHttpRequest = createNodeDescriptor({
 			},
 		},
 		{
+			key: "headersMode",
+			label: "Headers Input Mode",
+			type: "select",
+			defaultValue: "json",
+			description:
+				"Choose how to supply request headers. Both modes support {{ci.x}} and {{cc.x}}.",
+			params: {
+				options: [
+					{ label: "JSON Editor", value: "json" },
+					{ label: "Key-Value Pairs", value: "keyValue" },
+				],
+			},
+		},
+		{
 			key: "headers",
 			label: "Headers",
+			type: "json",
+			defaultValue: {},
+			description:
+				'Request headers as a JSON object. {{ci.x}} and {{cc.x}} are supported inside string values, e.g. {"Authorization": "Bearer {{ci.token}}"}.',
+			condition: { key: "headersMode", value: "json" },
+		},
+		{
+			key: "header1Name",
+			label: "Header 1 — Name",
 			type: "cognigyText",
 			defaultValue: "",
-			description:
-				'Additional request headers as a JSON object string. CognigyScript is supported, e.g. {"Authorization": "Bearer {{ci.token}}"}.',
-			params: {
-				placeholder: '{"Authorization": "Bearer {{ci.token}}"}',
-			},
+			params: { placeholder: "Authorization" },
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header1Value",
+			label: "Header 1 — Value",
+			type: "cognigyText",
+			defaultValue: "",
+			params: { placeholder: "Bearer {{ci.token}}" },
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header2Name",
+			label: "Header 2 — Name",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header2Value",
+			label: "Header 2 — Value",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header3Name",
+			label: "Header 3 — Name",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header3Value",
+			label: "Header 3 — Value",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header4Name",
+			label: "Header 4 — Name",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header4Value",
+			label: "Header 4 — Value",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header5Name",
+			label: "Header 5 — Name",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
+		},
+		{
+			key: "header5Value",
+			label: "Header 5 — Value",
+			type: "cognigyText",
+			defaultValue: "",
+			condition: { key: "headersMode", value: "keyValue" },
 		},
 		{
 			key: "bodyType",
@@ -201,14 +297,11 @@ export const pollingHttpRequest = createNodeDescriptor({
 		},
 		{
 			key: "body",
-			label: "Body (JSON)",
-			type: "cognigyText",
-			defaultValue: "{}",
+			label: "Body",
+			type: "json",
+			defaultValue: {},
 			description:
-				'Request body as a JSON object string. CognigyScript is supported, e.g. {"jobId": "{{ci.jobId}}"}.',
-			params: {
-				placeholder: '{"key": "{{ci.value}}"}',
-			},
+				'Request body as a JSON object. {{ci.x}} and {{cc.x}} are supported inside string values, e.g. {"jobId": "{{ci.jobId}}"}.',
 			condition: {
 				key: "bodyType",
 				value: "json",
@@ -228,13 +321,10 @@ export const pollingHttpRequest = createNodeDescriptor({
 		{
 			key: "bodyFormData",
 			label: "Body (Form Data)",
-			type: "cognigyText",
-			defaultValue: "{}",
+			type: "json",
+			defaultValue: {},
 			description:
-				'Request body as a JSON object string of key-value pairs, sent as form-encoded data. CognigyScript is supported, e.g. {"name": "{{ci.name}}"}.',
-			params: {
-				placeholder: '{"name": "{{ci.name}}"}',
-			},
+				'Request body as a JSON object of key-value pairs, sent as form-encoded data. {{ci.x}} and {{cc.x}} are supported inside string values, e.g. {"name": "{{ci.name}}"}.',
 			condition: {
 				key: "bodyType",
 				value: "formData",
@@ -374,7 +464,18 @@ export const pollingHttpRequest = createNodeDescriptor({
 			fields: [
 				"method",
 				"url",
+				"headersMode",
 				"headers",
+				"header1Name",
+				"header1Value",
+				"header2Name",
+				"header2Value",
+				"header3Name",
+				"header3Value",
+				"header4Name",
+				"header4Value",
+				"header5Name",
+				"header5Value",
 				"bodyType",
 				"body",
 				"bodyText",
@@ -460,15 +561,32 @@ export const pollingHttpRequest = createNodeDescriptor({
 			);
 		}
 
-		// Build static request headers (auth headers computed once).
-		// parseJsonField handles both cognigyText strings (CognigyScript resolved)
-		// and plain objects (test fixtures / legacy configs).
-		const parsedHeaders = parseJsonField(config.headers, "Headers") as Record<
-			string,
-			string
-		>;
+		// Build custom headers — two modes mirror the native HTTP Request node:
+		//   json      → json-type field (JSON editor); {{ci.x}} resolved in string values
+		//   keyValue  → up to 5 individual cognigyText key/value pairs
+		let customHeaders: Record<string, string> = {};
+		if ((config.headersMode ?? "json") === "keyValue") {
+			const pairs: Array<[string, string]> = [
+				[config.header1Name, config.header1Value],
+				[config.header2Name, config.header2Value],
+				[config.header3Name, config.header3Value],
+				[config.header4Name, config.header4Value],
+				[config.header5Name, config.header5Value],
+			];
+			for (const [name, value] of pairs) {
+				if (name?.trim()) {
+					customHeaders[name.trim()] = value ?? "";
+				}
+			}
+		} else {
+			customHeaders = parseJsonField(config.headers, "Headers") as Record<
+				string,
+				string
+			>;
+		}
+
 		const requestHeaders: Record<string, string> = {
-			...parsedHeaders,
+			...customHeaders,
 			...buildAuthHeaders(config),
 		};
 		const contentType = resolveContentType(config.bodyType);
