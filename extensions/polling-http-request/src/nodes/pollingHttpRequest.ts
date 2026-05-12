@@ -650,6 +650,7 @@ export const pollingHttpRequest = createNodeDescriptor({
 
 			const successValues = parseChipValues(config.successValues);
 			const failureValues = parseChipValues(config.failureValues);
+			const retryValues = parseChipValues(config.retryValues);
 
 			if (successValues.includes(statusValue)) {
 				storeResult(result);
@@ -663,7 +664,19 @@ export const pollingHttpRequest = createNodeDescriptor({
 				return;
 			}
 
-			// Not terminal — wait and retry (unless this was the last attempt)
+			// Non-terminal: poll again when allowed by Retry Values policy
+			const retryListEmpty = retryValues.length === 0;
+			const shouldPollAgain =
+				retryListEmpty ||
+				retryValues.includes(statusValue) ||
+				statusValue === "";
+
+			if (!shouldPollAgain) {
+				storeResult(result);
+				api.setNextNode(failureChild.id);
+				return;
+			}
+
 			if (attempt < config.maxRetries) {
 				await sleep(config.retryInterval ?? 2000);
 			}

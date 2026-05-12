@@ -158,6 +158,39 @@ describe("pollingHttpRequest", () => {
 		);
 	});
 
+	it("routes to onPollingFailure when retry list is non-empty and status is not a retry value", async () => {
+		mock.method(global, "fetch", async () =>
+			makeMockResponse({ status: "UNKNOWN" }),
+		);
+
+		await callNode(
+			baseConfig({
+				retryValues: "PENDING,IN_PROGRESS",
+				maxRetries: 2,
+			}),
+		);
+
+		assert.strictEqual(setNextNode.mock.calls.length, 1);
+		assert.strictEqual(
+			setNextNode.mock.calls[0].arguments[0],
+			"failure-child-id",
+		);
+	});
+
+	it("times out when retry values are empty and status is never terminal", async () => {
+		mock.method(global, "fetch", async () =>
+			makeMockResponse({ status: "UNKNOWN" }),
+		);
+
+		await callNode(baseConfig({ maxRetries: 2, retryValues: "" }));
+
+		assert.strictEqual(setNextNode.mock.calls.length, 1);
+		assert.strictEqual(
+			setNextNode.mock.calls[0].arguments[0],
+			"timeout-child-id",
+		);
+	});
+
 	it("retries on a retry value and routes to onPollingSuccess on a subsequent attempt", async () => {
 		// Stacked { times: 1 } mocks — last registered is consumed first.
 		mock.method(
