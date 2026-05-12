@@ -11,22 +11,49 @@ import { JSONPath } from "jsonpath-plus";
 export interface IPollingHttpRequestConfig {
 	method: "GET" | "POST" | "PUT" | "DELETE";
 	url: string;
-	headers: Record<string, string>;
+	// Header key-value pairs (1–6)
+	headerKey1: string;
+	headerValue1: string;
+	headerKey2: string;
+	headerValue2: string;
+	headerKey3: string;
+	headerValue3: string;
+	headerKey4: string;
+	headerValue4: string;
+	headerKey5: string;
+	headerValue5: string;
+	headerKey6: string;
+	headerValue6: string;
+	// Body
 	bodyType: "none" | "json" | "text" | "formData";
-	body: unknown;
 	bodyText: string;
-	bodyFormData: Record<string, string>;
+	// Body key-value pairs (1–6, used for both json and formData body types)
+	bodyKey1: string;
+	bodyValue1: string;
+	bodyKey2: string;
+	bodyValue2: string;
+	bodyKey3: string;
+	bodyValue3: string;
+	bodyKey4: string;
+	bodyValue4: string;
+	bodyKey5: string;
+	bodyValue5: string;
+	bodyKey6: string;
+	bodyValue6: string;
+	// Auth
 	authType: "none" | "basicAuth" | "apiKey";
 	username: string;
 	password: string;
 	apiKeyHeader: string;
 	apiKeyValue: string;
+	// Polling
 	retryInterval: number;
 	maxRetries: number;
 	terminationPath: string;
-	successValues: string[];
-	retryValues: string[];
-	failureValues: string[];
+	successValues: string;
+	retryValues: string;
+	failureValues: string;
+	// Storage
 	storeLocation: "input" | "context";
 	inputKey: string;
 	contextKey: string;
@@ -42,6 +69,55 @@ export interface IPollingHttpRequestParams extends INodeFunctionBaseParams {
 
 const sleep = (ms: number) =>
 	new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function buildPairsToObject(
+	pairs: Array<[string | undefined, string | undefined]>,
+): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const [key, value] of pairs) {
+		const trimmed = key?.trim();
+		if (trimmed) {
+			result[trimmed] = value ?? "";
+		}
+	}
+	return result;
+}
+
+function buildHeadersFromConfig(
+	config: IPollingHttpRequestConfig,
+): Record<string, string> {
+	return buildPairsToObject([
+		[config.headerKey1, config.headerValue1],
+		[config.headerKey2, config.headerValue2],
+		[config.headerKey3, config.headerValue3],
+		[config.headerKey4, config.headerValue4],
+		[config.headerKey5, config.headerValue5],
+		[config.headerKey6, config.headerValue6],
+	]);
+}
+
+function buildBodyPairsFromConfig(
+	config: IPollingHttpRequestConfig,
+): Record<string, string> {
+	return buildPairsToObject([
+		[config.bodyKey1, config.bodyValue1],
+		[config.bodyKey2, config.bodyValue2],
+		[config.bodyKey3, config.bodyValue3],
+		[config.bodyKey4, config.bodyValue4],
+		[config.bodyKey5, config.bodyValue5],
+		[config.bodyKey6, config.bodyValue6],
+	]);
+}
+
+function parseChipValues(raw: unknown): string[] {
+	if (raw == null) return [];
+	const s = typeof raw === "string" ? raw : String(raw);
+	if (s.trim() === "") return [];
+	return s
+		.split(",")
+		.map((v) => v.trim())
+		.filter(Boolean);
+}
 
 function buildAuthHeaders(
 	config: IPollingHttpRequestConfig,
@@ -76,12 +152,12 @@ function resolveContentType(
 function buildBody(config: IPollingHttpRequestConfig): string | undefined {
 	switch (config.bodyType) {
 		case "json":
-			return JSON.stringify(config.body ?? {});
+			return JSON.stringify(buildBodyPairsFromConfig(config));
 		case "text":
 			return String(config.bodyText ?? "");
 		case "formData": {
 			const params = new URLSearchParams();
-			for (const [k, v] of Object.entries(config.bodyFormData ?? {})) {
+			for (const [k, v] of Object.entries(buildBodyPairsFromConfig(config))) {
 				params.append(k, String(v));
 			}
 			return params.toString();
@@ -89,6 +165,60 @@ function buildBody(config: IPollingHttpRequestConfig): string | undefined {
 		default:
 			return undefined;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Field helpers — generates a key+value pair of cognigyText fields
+// ---------------------------------------------------------------------------
+
+function headerPairFields(n: number) {
+	return [
+		{
+			key: `headerKey${n}`,
+			label: `Key ${n}`,
+			type: "cognigyText" as const,
+			defaultValue: "",
+			params: { placeholder: "Header-Name" },
+		},
+		{
+			key: `headerValue${n}`,
+			label: `Value ${n}`,
+			type: "cognigyText" as const,
+			defaultValue: "",
+			params: { placeholder: "value" },
+		},
+	];
+}
+
+function bodyPairFields(n: number) {
+	return [
+		{
+			key: `bodyKey${n}`,
+			label: `Key ${n}`,
+			type: "cognigyText" as const,
+			defaultValue: "",
+			params: { placeholder: "fieldName" },
+			condition: {
+				or: [
+					{ key: "bodyType", value: "json" },
+					{ key: "bodyType", value: "formData" },
+				],
+			},
+		},
+		{
+			key: `bodyValue${n}`,
+			label: `Value ${n}`,
+			type: "cognigyText" as const,
+			defaultValue: "",
+			params: { placeholder: "value" },
+			condition: {
+				or: [
+					{ key: "bodyType", value: "json" },
+					{ key: "bodyType", value: "formData" },
+				],
+			},
+		},
+	];
 }
 
 // ---------------------------------------------------------------------------
@@ -132,13 +262,16 @@ export const pollingHttpRequest = createNodeDescriptor({
 				placeholder: "https://api.example.com/jobs/{{input.jobId}}",
 			},
 		},
-		{
-			key: "headers",
-			label: "Headers",
-			type: "json",
-			defaultValue: {},
-			description: "Additional request headers as a JSON object.",
-		},
+
+		// ── Header key-value pairs ────────────────────────────────────────────
+		...headerPairFields(1),
+		...headerPairFields(2),
+		...headerPairFields(3),
+		...headerPairFields(4),
+		...headerPairFields(5),
+		...headerPairFields(6),
+
+		// ── Body ─────────────────────────────────────────────────────────────
 		{
 			key: "bodyType",
 			label: "Body Type",
@@ -160,39 +293,24 @@ export const pollingHttpRequest = createNodeDescriptor({
 			},
 		},
 		{
-			key: "body",
-			label: "Body",
-			type: "json",
-			defaultValue: {},
-			description: "Request body as a JSON object.",
-			condition: {
-				key: "bodyType",
-				value: "json",
-			},
-		},
-		{
 			key: "bodyText",
 			label: "Body",
 			type: "cognigyText",
 			defaultValue: "",
-			description: "Request body as plain text.",
+			description: "Request body as plain text. CognigyScript is supported.",
 			condition: {
 				key: "bodyType",
 				value: "text",
 			},
 		},
-		{
-			key: "bodyFormData",
-			label: "Body (Form Data)",
-			type: "json",
-			defaultValue: {},
-			description:
-				"Request body as a JSON object of key-value pairs, sent as form-encoded data.",
-			condition: {
-				key: "bodyType",
-				value: "formData",
-			},
-		},
+
+		// ── Body key-value pairs (json / formData) ────────────────────────────
+		...bodyPairFields(1),
+		...bodyPairFields(2),
+		...bodyPairFields(3),
+		...bodyPairFields(4),
+		...bodyPairFields(5),
+		...bodyPairFields(6),
 
 		// ── Authentication ────────────────────────────────────────────────────
 		{
@@ -268,23 +386,35 @@ export const pollingHttpRequest = createNodeDescriptor({
 		{
 			key: "successValues",
 			label: "Success Values",
-			type: "chipInput",
-			defaultValue: ["COMPLETED", "SUCCESS"],
-			description: "Status values that trigger the On Success exit.",
+			type: "cognigyText",
+			defaultValue: "COMPLETED,SUCCESS",
+			description:
+				"Comma-separated status values that trigger the On Success exit. CognigyScript is supported, e.g. COMPLETED,{{cc.allowedSuccesses}} or {{ci.statusDone}}",
+			params: {
+				placeholder: "COMPLETED,SUCCESS",
+			},
 		},
 		{
 			key: "retryValues",
 			label: "Retry Values",
-			type: "chipInput",
-			defaultValue: ["PENDING", "IN_PROGRESS"],
-			description: "Status values that trigger another retry.",
+			type: "cognigyText",
+			defaultValue: "PENDING,IN_PROGRESS",
+			description:
+				"Comma-separated status values that trigger another polling retry. CognigyScript is supported, e.g. PENDING,{{ci.pendingStates}}",
+			params: {
+				placeholder: "PENDING,IN_PROGRESS",
+			},
 		},
 		{
 			key: "failureValues",
 			label: "Failure Values",
-			type: "chipInput",
-			defaultValue: ["FAILED", "CANCELLED"],
-			description: "Status values that trigger the On Failure exit.",
+			type: "cognigyText",
+			defaultValue: "FAILED,CANCELLED",
+			description:
+				"Comma-separated status values that trigger the On Failure exit. CognigyScript is supported, e.g. FAILED,{{cp.failureCodes}}",
+			params: {
+				placeholder: "FAILED,CANCELLED",
+			},
 		},
 
 		// ── Result Storage ────────────────────────────────────────────────────
@@ -324,14 +454,46 @@ export const pollingHttpRequest = createNodeDescriptor({
 			key: "httpSection",
 			label: "HTTP Request",
 			defaultCollapsed: false,
+			fields: ["method", "url"],
+		},
+		{
+			key: "headersSection",
+			label: "Request Headers",
+			defaultCollapsed: false,
 			fields: [
-				"method",
-				"url",
-				"headers",
+				"headerKey1",
+				"headerValue1",
+				"headerKey2",
+				"headerValue2",
+				"headerKey3",
+				"headerValue3",
+				"headerKey4",
+				"headerValue4",
+				"headerKey5",
+				"headerValue5",
+				"headerKey6",
+				"headerValue6",
+			],
+		},
+		{
+			key: "bodySection",
+			label: "Request Body",
+			defaultCollapsed: false,
+			fields: [
 				"bodyType",
-				"body",
 				"bodyText",
-				"bodyFormData",
+				"bodyKey1",
+				"bodyValue1",
+				"bodyKey2",
+				"bodyValue2",
+				"bodyKey3",
+				"bodyValue3",
+				"bodyKey4",
+				"bodyValue4",
+				"bodyKey5",
+				"bodyValue5",
+				"bodyKey6",
+				"bodyValue6",
 			],
 		},
 		{
@@ -369,6 +531,8 @@ export const pollingHttpRequest = createNodeDescriptor({
 
 	form: [
 		{ type: "section", key: "httpSection" },
+		{ type: "section", key: "headersSection" },
+		{ type: "section", key: "bodySection" },
 		{ type: "section", key: "authSection" },
 		{ type: "section", key: "pollingSection" },
 		{ type: "section", key: "storageSection" },
@@ -405,7 +569,7 @@ export const pollingHttpRequest = createNodeDescriptor({
 
 		// Build static request headers (auth headers computed once)
 		const requestHeaders: Record<string, string> = {
-			...(config.headers ?? {}),
+			...buildHeadersFromConfig(config),
 			...buildAuthHeaders(config),
 		};
 		const contentType = resolveContentType(config.bodyType);
@@ -484,8 +648,8 @@ export const pollingHttpRequest = createNodeDescriptor({
 				}
 			}
 
-			const successValues = config.successValues ?? [];
-			const failureValues = config.failureValues ?? [];
+			const successValues = parseChipValues(config.successValues);
+			const failureValues = parseChipValues(config.failureValues);
 
 			if (successValues.includes(statusValue)) {
 				storeResult(result);

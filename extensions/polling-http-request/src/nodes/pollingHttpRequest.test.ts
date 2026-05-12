@@ -39,11 +39,32 @@ function baseConfig(
 	return {
 		method: "GET",
 		url: "https://api.example.com/jobs/42",
-		headers: {},
+		headerKey1: "",
+		headerValue1: "",
+		headerKey2: "",
+		headerValue2: "",
+		headerKey3: "",
+		headerValue3: "",
+		headerKey4: "",
+		headerValue4: "",
+		headerKey5: "",
+		headerValue5: "",
+		headerKey6: "",
+		headerValue6: "",
 		bodyType: "none",
-		body: {},
 		bodyText: "",
-		bodyFormData: {},
+		bodyKey1: "",
+		bodyValue1: "",
+		bodyKey2: "",
+		bodyValue2: "",
+		bodyKey3: "",
+		bodyValue3: "",
+		bodyKey4: "",
+		bodyValue4: "",
+		bodyKey5: "",
+		bodyValue5: "",
+		bodyKey6: "",
+		bodyValue6: "",
 		authType: "none",
 		username: "",
 		password: "",
@@ -52,9 +73,9 @@ function baseConfig(
 		retryInterval: 0,
 		maxRetries: 3,
 		terminationPath: "$.status",
-		successValues: ["COMPLETED", "SUCCESS"],
-		retryValues: ["PENDING", "IN_PROGRESS"],
-		failureValues: ["FAILED", "CANCELLED"],
+		successValues: "COMPLETED,SUCCESS",
+		retryValues: "PENDING,IN_PROGRESS",
+		failureValues: "FAILED,CANCELLED",
 		storeLocation: "context",
 		inputKey: "pollingResult",
 		contextKey: "pollingResult",
@@ -276,7 +297,8 @@ describe("pollingHttpRequest", () => {
 			baseConfig({
 				method: "POST",
 				bodyType: "json",
-				body: { foo: "bar" },
+				bodyKey1: "foo",
+				bodyValue1: "bar",
 			}),
 		);
 
@@ -299,7 +321,10 @@ describe("pollingHttpRequest", () => {
 			baseConfig({
 				method: "POST",
 				bodyType: "formData",
-				bodyFormData: { name: "alice", role: "admin" },
+				bodyKey1: "name",
+				bodyValue1: "alice",
+				bodyKey2: "role",
+				bodyValue2: "admin",
 			}),
 		);
 
@@ -354,7 +379,7 @@ describe("pollingHttpRequest", () => {
 		await callNode(
 			baseConfig({
 				terminationPath: "$.data.job.state",
-				successValues: ["SUCCESS"],
+				successValues: "SUCCESS",
 			}),
 		);
 
